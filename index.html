@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html lang="mn">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Математикийн Тэмцээн - Math Duel</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600;700&family=Nunito:wght@400;700;900&display=swap" rel="stylesheet">
+    <!-- Canvas Confetti -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    
+    <style>
+        body {
+            font-family: 'Nunito', sans-serif;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: manipulation;
+        }
+        .font-fredoka {
+            font-family: 'Fredoka', sans-serif;
+        }
+        .rotated-p1 {
+            transform: rotate(180deg);
+        }
+        .btn-bounce {
+            transition: transform 0.1s ease, box-shadow 0.1s ease;
+        }
+        .btn-bounce:active {
+            transform: scale(0.95);
+        }
+        .shake {
+            animation: shake 0.4s ease-in-out;
+        }
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            20%, 60% { transform: translateX(-10px); }
+            40%, 80% { transform: translateX(10px); }
+        }
+        .pop-in {
+            animation: popIn 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        @keyframes popIn {
+            0% { transform: scale(0.5); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+    </style>
+</head>
+<body class="bg-slate-900 text-white min-h-screen flex flex-col justify-center items-center overflow-x-hidden p-2 sm:p-4">
+
+    <!-- Web Audio API Sound Generator -->
+    <script>
+        class SoundFX {
+            constructor() {
+                this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            playTone(freq, type, duration, vol = 0.1) {
+                if (this.ctx.state === 'suspended') this.ctx.resume();
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = type;
+                osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+                gain.gain.setValueAtTime(vol, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + duration);
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start();
+                osc.stop(this.ctx.currentTime + duration);
+            }
+            correct() {
+                this.playTone(523.25, 'sine', 0.1, 0.15); // C5
+                setTimeout(() => this.playTone(659.25, 'sine', 0.15, 0.15), 80); // E5
+                setTimeout(() => this.playTone(783.99, 'sine', 0.25, 0.2), 160); // G5
+            }
+            wrong() {
+                this.playTone(220, 'sawtooth', 0.15, 0.2);
+                setTimeout(() => this.playTone(180, 'sawtooth', 0.25, 0.2), 100);
+            }
+            click() {
+                this.playTone(400, 'triangle', 0.05, 0.05);
+            }
+            win() {
+                const notes = [400, 500, 600, 800, 1000];
+                notes.forEach((freq, idx) => {
+                    setTimeout(() => this.playTone(freq, 'sine', 0.2, 0.15), idx * 100);
+                });
+            }
+        }
+        const sound = new SoundFX();
+    </script>
+
+    <!-- Main Container -->
+    <div id="app" class="w-full max-w-4xl min-h-[90vh] flex flex-col justify-center items-center relative">
+
+        <!-- ================= MAIN MENU ================= -->
+        <div id="main-menu" class="w-full max-w-md bg-slate-800 rounded-3xl p-6 sm:p-8 border-4 border-indigo-500/30 shadow-2xl text-center space-y-6 pop-in">
+            <div class="space-y-2">
+                <div class="inline-block p-4 bg-indigo-600/30 rounded-full text-indigo-400 mb-2">
+                    <i class="fa-solid fa-calculator text-5xl"></i>
+                </div>
+                <h1 class="text-3xl sm:text-4xl font-extrabold font-fredoka text-transparent bg-clip-text bg-gradient-to-r from-amber-400 via-rose-400 to-indigo-400">
+                    ТООНЫ ТЭМЦЭЭН
+                </h1>
+                <p class="text-slate-400 text-sm sm:text-base">Хурдан бодлого бодож ялагч болцгооё!</p>
+            </div>
+
+            <!-- Categories Selection -->
+            <div class="space-y-2 text-left">
+                <label class="text-xs font-bold uppercase tracking-wider text-slate-400">Үйлдэл сонгох:</label>
+                <div class="grid grid-cols-5 gap-2">
+                    <button onclick="selectCategory('add', this)" class="cat-btn bg-indigo-600 text-white font-bold p-3 rounded-2xl text-xl btn-bounce border-2 border-indigo-400">+</button>
+                    <button onclick="selectCategory('sub', this)" class="cat-btn bg-slate-700 hover:bg-slate-600 text-white font-bold p-3 rounded-2xl text-xl btn-bounce border-2 border-transparent">-</button>
+                    <button onclick="selectCategory('mul', this)" class="cat-btn bg-slate-700 hover:bg-slate-600 text-white font-bold p-3 rounded-2xl text-xl btn-bounce border-2 border-transparent">×</button>
+                    <button onclick="selectCategory('div', this)" class="cat-btn bg-slate-700 hover:bg-slate-600 text-white font-bold p-3 rounded-2xl text-xl btn-bounce border-2 border-transparent">÷</button>
+                    <button onclick="selectCategory('mix', this)" class="cat-btn bg-slate-700 hover:bg-slate-600 text-white font-bold p-3 rounded-2xl text-sm btn-bounce border-2 border-transparent">Бүгд</button>
+                </div>
+            </div>
+
+            <!-- AI Difficulty Selection (Hidden by default, shown when VS AI clicked) -->
+            <div id="ai-diff-container" class="space-y-2 text-left hidden">
+                <label class="text-xs font-bold uppercase tracking-wider text-slate-400">Ботын түвшин:</label>
+                <div class="grid grid-cols-3 gap-2">
+                    <button onclick="selectDiff('easy', this)" class="diff-btn bg-emerald-600 text-white font-bold py-2 rounded-xl text-xs sm:text-sm btn-bounce border-2 border-emerald-400">Хялбар</button>
+                    <button onclick="selectDiff('medium', this)" class="diff-btn bg-slate-700 text-white font-bold py-2 rounded-xl text-xs sm:text-sm btn-bounce border-2 border-transparent">Дунд</button>
+                    <button onclick="selectDiff('hard', this)" class="diff-btn bg-slate-700 text-white font-bold py-2 rounded-xl text-xs sm:text-sm btn-bounce border-2 border-transparent">Хүнд</button>
+                </div>
+            </div>
+
+            <!-- Mode Selection Buttons -->
+            <div class="space-y-3 pt-2">
+                <button onclick="showAIDifficulty()" class="w-full py-4 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 font-bold rounded-2xl text-lg shadow-lg shadow-emerald-900/40 flex items-center justify-center gap-3 btn-bounce">
+                    <i class="fa-solid fa-robot text-xl"></i> Ганц тоглогч (VS Бот)
+                </button>
+
+                <button onclick="startGame('duel')" class="w-full py-4 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-400 hover:to-orange-500 font-bold rounded-2xl text-lg shadow-lg shadow-orange-900/40 flex items-center justify-center gap-3 btn-bounce">
+                    <i class="fa-solid fa-user-group text-xl"></i> 2 Тоглогч (Нэг дэлгэц)
+                </button>
+
+                <button onclick="startGame('speed')" class="w-full py-4 bg-gradient-to-r from-rose-500 to-pink-600 hover:from-rose-400 hover:to-pink-500 font-bold rounded-2xl text-lg shadow-lg shadow-pink-900/40 flex items-center justify-center gap-3 btn-bounce">
+                    <i class="fa-solid fa-bolt text-xl"></i> Хурдны тэмцээн (60 сек)
+                </button>
+            </div>
+        </div>
+
+        <!-- ================= 2 PLAYER DUEL / VS AI SCREEN ================= -->
+        <div id="duel-screen" class="w-full h-[95vh] flex flex-col justify-between hidden py-2">
+            
+            <!-- Player 1 Zone (Top - Rotated for Face-to-Face or AI status) -->
+            <div id="p1-zone" class="w-full flex-1 bg-slate-800/80 rounded-3xl p-4 sm:p-6 border-4 border-indigo-500/30 flex flex-col justify-between relative overflow-hidden rotated-p1 transition-all">
+                <!-- Top Status Header -->
+                <div class="flex justify-between items-center text-slate-300 font-bold text-sm sm:text-lg">
+                    <span id="p1-name" class="flex items-center gap-2"><i class="fa-solid fa-user text-indigo-400"></i> Тоглогч 1</span>
+                    <span id="p1-combo" class="text-amber-400 text-xs sm:text-sm font-extrabold">Combo: x0</span>
+                    <span class="text-2xl font-black text-indigo-400" id="p1-score">0</span>
+                </div>
+
+                <!-- Question Box -->
+                <div class="text-center my-auto">
+                    <div id="p1-question" class="text-4xl sm:text-6xl font-black font-fredoka text-white tracking-wide">
+                        0 + 0 = ?
+                    </div>
+                </div>
+
+                <!-- Answer Grid -->
+                <div id="p1-answers" class="grid grid-cols-2 gap-3 sm:gap-4">
+                    <!-- Buttons generated dynamically -->
+                </div>
+            </div>
+
+            <!-- Divider / Status Controls -->
+            <div class="h-12 flex justify-between items-center px-4 my-2 z-10 w-full max-w-md mx-auto">
+                <button onclick="quitGame()" class="bg-slate-700 hover:bg-slate-600 px-4 py-2 rounded-xl text-xs font-bold text-slate-300 border border-slate-600 btn-bounce">
+                    <i class="fa-solid fa-arrow-left mr-1"></i> Гарах
+                </button>
+                <div id="duel-timer" class="bg-indigo-600 px-4 py-1.5 rounded-full text-base font-extrabold text-white shadow-lg border-2 border-indigo-400">
+                    <i class="fa-solid fa-stopwatch mr-1"></i> <span id="timer-text">--</span>
+                </div>
+            </div>
+
+            <!-- Player 2 Zone (Bottom) -->
+            <div id="p2-zone" class="w-full flex-1 bg-slate-800/80 rounded-3xl p-4 sm:p-6 border-4 border-emerald-500/30 flex flex-col justify-between relative overflow-hidden transition-all">
+                <!-- Status Header -->
+                <div class="flex justify-between items-center text-slate-300 font-bold text-sm sm:text-lg">
+                    <span id="p2-name" class="flex items-center gap-2"><i class="fa-solid fa-user text-emerald-400"></i> Тоглогч 2</span>
+                    <span id="p2-combo" class="text-amber-400 text-xs sm:text-sm font-extrabold">Combo: x0</span>
+                    <span class="text-2xl font-black text-emerald-400" id="p2-score">0</span>
+                </div>
+
+                <!-- Question Box -->
+                <div class="text-center my-auto">
+                    <div id="p2-question" class="text-4xl sm:text-6xl font-black font-fredoka text-white tracking-wide">
+                        0 + 0 = ?
+                    </div>
+                </div>
+
+                <!-- Answer Grid -->
+                <div id="p2-answers" class="grid grid-cols-2 gap-3 sm:gap-4">
+                    <!-- Buttons generated dynamically -->
+                </div>
+            </div>
+        </div>
+
+        <!-- ================= SPEED / TIME ATTACK SCREEN ================= -->
+        <div id="speed-screen" class="w-full max-w-lg bg-slate-800 rounded-3xl p-6 sm:p-8 border-4 border-rose-500/30 shadow-2xl hidden text-center space-y-6 pop-in">
+            <!-- Header Status -->
+            <div class="flex justify-between items-center bg-slate-900/60 p-4 rounded-2xl border border-slate-700">
+                <div class="text-left">
+                    <div class="text-xs font-bold text-slate-400 uppercase">Оноо</div>
+                    <div id="speed-score" class="text-3xl font-black text-rose-400 font-fredoka">0</div>
+                </div>
+                <div class="text-center">
+                    <div class="text-xs font-bold text-slate-400 uppercase">Комбо</div>
+                    <div id="speed-combo" class="text-xl font-black text-amber-400">x0</div>
+                </div>
+                <div class="text-right">
+                    <div class="text-xs font-bold text-slate-400 uppercase">Үлдсэн цаг</div>
+                    <div id="speed-timer" class="text-3xl font-black text-emerald-400 font-fredoka">60s</div>
+                </div>
+            </div>
+
+            <!-- Question display -->
+            <div class="py-8 bg-slate-900/40 rounded-3xl border border-slate-700/50">
+                <div id="speed-question" class="text-5xl sm:text-6xl font-black font-fredoka text-white tracking-wider">
+                    0 + 0 = ?
+                </div>
+            </div>
+
+            <!-- Answers Grid -->
+            <div id="speed-answers" class="grid grid-cols-2 gap-4">
+                <!-- Dynamic answers -->
+            </div>
+
+            <button onclick="quitGame()" class="w-full py-3 bg-slate-700 hover:bg-slate-600 rounded-xl font-bold text-slate-300 btn-bounce text-sm">
+                Тэмцээнийг зогсоох
+            </button>
+        </div>
+
+        <!-- ================= GAME OVER MODAL ================= -->
+        <div id="game-over-modal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex justify-center items-center z-50 hidden p-4">
+            <div class="bg-slate-800 border-4 border-indigo-500 rounded-3xl p-6 sm:p-8 max-w-md w-full text-center space-y-6 pop-in shadow-2xl">
+                <div id="winner-icon" class="text-6xl text-amber-400 animate-bounce">
+                    <i class="fa-solid fa-trophy"></i>
+                </div>
+                <div class="space-y-1">
+                    <h2 id="winner-title" class="text-3xl font-black font-fredoka text-white">ЯЛАГЧ!</h2>
+                    <p id="winner-subtitle" class="text-slate-400 text-sm">Гайхалтай тоглолт боллоо!</p>
+                </div>
+
+                <!-- Score Summary -->
+                <div class="bg-slate-900/60 p-4 rounded-2xl border border-slate-700 space-y-3 text-left">
+                    <div id="score-summary-1" class="flex justify-between items-center font-bold">
+                        <span class="text-indigo-400">Тоглогч 1:</span>
+                        <span id="final-score-1" class="text-xl text-white">0 оноо</span>
+                    </div>
+                    <div id="score-summary-2" class="flex justify-between items-center font-bold">
+                        <span class="text-emerald-400">Тоглогч 2:</span>
+                        <span id="final-score-2" class="text-xl text-white">0 оноо</span>
+                    </div>
+                </div>
+
+                <div class="flex gap-3">
+                    <button onclick="restartGame()" class="flex-1 py-4 bg-indigo-600 hover:bg-indigo-500 font-bold rounded-2xl text-white shadow-lg btn-bounce">
+                        <i class="fa-solid fa-rotate-right mr-1"></i> Дахин тоглох
+                    </button>
+                    <button onclick="quitGame()" class="flex-1 py-4 bg-slate-700 hover:bg-slate-600 font-bold rounded-2xl text-slate-300 btn-bounce">
+                        <i class="fa-solid fa-house mr-1"></i> Цэс рүү
+                    </button>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <!-- JavaScript Logic -->
+    <script>
+        // Game State
+        let currentMode = 'duel'; // 'vs-ai', 'duel', 'speed'
+        let selectedCategory = 'add';
+        let aiDifficulty = 'medium'; // 'easy', 'medium', 'hard'
+        let gameTimer = null;
+        let aiLoopTimer = null;
+        let timeLeft = 60;
+
+        // Player states
+        let p1 = { score: 0, combo: 0, currentAns: null, question: '' };
+        let p2 = { score: 0, combo: 0, currentAns: null, question: '' };
+
+        // Category Selection
+        function selectCategory(cat, btn) {
+            sound.click();
+            selectedCategory = cat;
+            document.querySelectorAll('.cat-btn').forEach(b => {
+                b.classList.remove('bg-indigo-600', 'border-indigo-400');
+                b.classList.add('bg-slate-700', 'border-transparent');
+            });
+            btn.classList.remove('bg-slate-700', 'border-transparent');
+            btn.classList.add('bg-indigo-600', 'border-indigo-400');
+        }
+
+        // Show AI diff options
+        function showAIDifficulty() {
+            sound.click();
+            const container = document.getElementById('ai-diff-container');
+            if (container.classList.contains('hidden')) {
+                container.classList.remove('hidden');
+            } else {
+                startGame('vs-ai');
+            }
+        }
+
+        // AI Diff selection
+        function selectDiff(diff, btn) {
+            sound.click();
+            aiDifficulty = diff;
+            document.querySelectorAll('.diff-btn').forEach(b => {
+                b.classList.remove('bg-emerald-600', 'border-emerald-400');
+                b.classList.add('bg-slate-700', 'border-transparent');
+            });
+            btn.classList.remove('bg-slate-700', 'border-transparent');
+            btn.classList.add('bg-emerald-600', 'border-emerald-400');
+            startGame('vs-ai');
+        }
+
+        // Start Game Init
+        function startGame(mode) {
+            sound.click();
+            currentMode = mode;
+            p1 = { score: 0, combo: 0, currentAns: null, question: '' };
+            p2 = { score: 0, combo: 0, currentAns: null, question: '' };
+
+            document.getElementById('main-menu').classList.add('hidden');
+            document.getElementById('game-over-modal').classList.add('hidden');
+
+            if (mode === 'duel' || mode === 'vs-ai') {
+                document.getElementById('duel-screen').classList.remove('hidden');
+                document.getElementById('speed-screen').classList.add('hidden');
+
+                const p1Name = document.getElementById('p1-name');
+                const p1Zone = document.getElementById('p1-zone');
+
+                if (mode === 'vs-ai') {
+                    p1Name.innerHTML = `<i class="fa-solid fa-robot text-indigo-400"></i> Бот (${getDiffName(aiDifficulty)})`;
+                    p1Zone.classList.remove('rotated-p1'); // Keep upright if playing against bot
+                    startAIBot();
+                } else {
+                    p1Name.innerHTML = `<i class="fa-solid fa-user text-indigo-400"></i> Тоглогч 1`;
+                    p1Zone.classList.add('rotated-p1'); // Rotate for split screen face-to-face
+                }
+
+                updateScores();
+                nextQuestion(1);
+                nextQuestion(2);
+                startTimer(60);
+
+            } else if (mode === 'speed') {
+                document.getElementById('duel-screen').classList.add('hidden');
+                document.getElementById('speed-screen').classList.remove('hidden');
+                updateScores();
+                nextQuestion(2); // Use p2 state for single speed run
+                startTimer(60);
+            }
+        }
+
+        function getDiffName(diff) {
+            if (diff === 'easy') return 'Хялбар';
+            if (diff === 'medium') return 'Дунд';
+            return 'Хүнд';
+        }
+
+        // Timer
+        function startTimer(seconds) {
+            clearInterval(gameTimer);
+            timeLeft = seconds;
+            updateTimerUI();
+
+            gameTimer = setInterval(() => {
+                timeLeft--;
+                updateTimerUI();
+                if (timeLeft <= 0) {
+                    clearInterval(gameTimer);
+                    endGame();
+                }
+            }, 1000);
+        }
+
+        function updateTimerUI() {
+            if (currentMode === 'speed') {
+                document.getElementById('speed-timer').textContent = `${timeLeft}s`;
+            } else {
+                document.getElementById('timer-text').textContent = `${timeLeft}s`;
+            }
+        }
+
+        // Math Generator
+        function generateMathProblem() {
+            let ops = ['+', '-', '*', '/'];
+            if (selectedCategory === 'add') ops = ['+'];
+            if (selectedCategory === 'sub') ops = ['-'];
+            if (selectedCategory === 'mul') ops = ['*'];
+            if (selectedCategory === 'div') ops = ['/'];
+
+            const op = ops[Math.floor(Math.random() * ops.length)];
+            let num1, num2, answer;
+
+            switch (op) {
+                case '+':
+                    num1 = Math.floor(Math.random() * 20) + 1;
+                    num2 = Math.floor(Math.random() * 20) + 1;
+                    answer = num1 + num2;
+                    break;
+                case '-':
+                    num1 = Math.floor(Math.random() * 25) + 5;
+                    num2 = Math.floor(Math.random() * num1) + 1;
+                    answer = num1 - num2;
+                    break;
+                case '*':
+                    num1 = Math.floor(Math.random() * 10) + 1;
+                    num2 = Math.floor(Math.random() * 10) + 1;
+                    answer = num1 * num2;
+                    break;
+                case '/':
+                    num2 = Math.floor(Math.random() * 9) + 2;
+                    answer = Math.floor(Math.random() * 10) + 1;
+                    num1 = num2 * answer;
+                    break;
+            }
+
+            // Generate options
+            let options = new Set([answer]);
+            while (options.size < 4) {
+                let offset = (Math.floor(Math.random() * 5) + 1) * (Math.random() > 0.5 ? 1 : -1);
+                let wrongAns = answer + offset;
+                if (wrongAns >= 0) options.add(wrongAns);
+            }
+
+            const symbols = { '+': '+', '-': '-', '*': '×', '/': '÷' };
+
+            return {
+                text: `${num1} ${symbols[op]} ${num2} = ?`,
+                answer: answer,
+                options: Array.from(options).sort(() => Math.random() - 0.5)
+            };
+        }
+
+        // Render Question
+        function nextQuestion(playerNum) {
+            const prob = generateMathProblem();
+            if (playerNum === 1) {
+                p1.currentAns = prob.answer;
+                p1.question = prob.text;
+                document.getElementById('p1-question').textContent = prob.text;
+                renderAnswers('p1-answers', prob.options, 1);
+            } else {
+                p2.currentAns = prob.answer;
+                p2.question = prob.text;
+                if (currentMode === 'speed') {
+                    document.getElementById('speed-question').textContent = prob.text;
+                    renderAnswers('speed-answers', prob.options, 2);
+                } else {
+                    document.getElementById('p2-question').textContent = prob.text;
+                    renderAnswers('p2-answers', prob.options, 2);
+                }
+            }
+        }
+
+        function renderAnswers(elementId, options, playerNum) {
+            const container = document.getElementById(elementId);
+            container.innerHTML = '';
+            options.forEach(opt => {
+                const btn = document.createElement('button');
+                btn.className = `w-full py-3 sm:py-5 bg-slate-700/80 hover:bg-slate-600 text-white font-black text-xl sm:text-2xl rounded-2xl border-2 border-slate-600 btn-bounce shadow-lg`;
+                btn.textContent = opt;
+                btn.onclick = () => checkAnswer(playerNum, opt, btn);
+                container.appendChild(btn);
+            });
+        }
+
+        // Check Answer
+        function checkAnswer(playerNum, selected, btnElement) {
+            const p = playerNum === 1 ? p1 : p2;
+
+            if (selected === p.currentAns) {
+                sound.correct();
+                p.combo += 1;
+                p.score += 10 + (p.combo * 2);
+
+                btnElement.classList.remove('bg-slate-700/80');
+                btnElement.classList.add('bg-emerald-600', 'border-emerald-400');
+
+                setTimeout(() => {
+                    updateScores();
+                    nextQuestion(playerNum);
+                }, 150);
+
+            } else {
+                sound.wrong();
+                p.combo = 0;
+                p.score = Math.max(0, p.score - 5);
+
+                btnElement.classList.remove('bg-slate-700/80');
+                btnElement.classList.add('bg-rose-600', 'border-rose-400', 'shake');
+
+                setTimeout(() => {
+                    updateScores();
+                    nextQuestion(playerNum);
+                }, 300);
+            }
+        }
+
+        // AI Logic
+        function startAIBot() {
+            clearInterval(aiLoopTimer);
+            let speedMs = 3500;
+            let accuracy = 0.6;
+
+            if (aiDifficulty === 'medium') { speedMs = 2500; accuracy = 0.8; }
+            if (aiDifficulty === 'hard') { speedMs = 1600; accuracy = 0.95; }
+
+            aiLoopTimer = setInterval(() => {
+                if (currentMode !== 'vs-ai' || timeLeft <= 0) return;
+
+                const isCorrect = Math.random() < accuracy;
+                if (isCorrect) {
+                    p1.combo += 1;
+                    p1.score += 10 + (p1.combo * 2);
+                    sound.correct();
+                } else {
+                    p1.combo = 0;
+                    p1.score = Math.max(0, p1.score - 5);
+                }
+
+                updateScores();
+                nextQuestion(1);
+
+            }, speedMs);
+        }
+
+        // Update Scores UI
+        function updateScores() {
+            if (currentMode === 'speed') {
+                document.getElementById('speed-score').textContent = p2.score;
+                document.getElementById('speed-combo').textContent = `x${p2.combo}`;
+            } else {
+                document.getElementById('p1-score').textContent = p1.score;
+                document.getElementById('p1-combo').textContent = `Combo: x${p1.combo}`;
+                document.getElementById('p2-score').textContent = p2.score;
+                document.getElementById('p2-combo').textContent = `Combo: x${p2.combo}`;
+            }
+        }
+
+        // End Game
+        function endGame() {
+            sound.win();
+            clearInterval(gameTimer);
+            clearInterval(aiLoopTimer);
+
+            const modal = document.getElementById('game-over-modal');
+            const winnerTitle = document.getElementById('winner-title');
+            const winnerSub = document.getElementById('winner-subtitle');
+            const summary1 = document.getElementById('score-summary-1');
+            const summary2 = document.getElementById('score-summary-2');
+
+            modal.classList.remove('hidden');
+
+            if (currentMode === 'speed') {
+                winnerTitle.textContent = "ЦАГ ДУУСЛАА!";
+                winnerSub.textContent = `Та 60 секундэд ${p2.score} оноо цуглууллаа!`;
+                summary1.classList.add('hidden');
+                summary2.innerHTML = `<span class="text-rose-400">Нийт Оноо:</span> <span class="text-xl text-white">${p2.score} оноо</span>`;
+            } else {
+                summary1.classList.remove('hidden');
+                document.getElementById('final-score-1').textContent = `${p1.score} оноо`;
+                document.getElementById('final-score-2').textContent = `${p2.score} оноо`;
+
+                const p1Title = currentMode === 'vs-ai' ? `Бот (${getDiffName(aiDifficulty)})` : 'Тоглогч 1';
+
+                if (p1.score > p2.score) {
+                    winnerTitle.textContent = `${p1Title} ЯЛАА! 🎉`;
+                    winnerSub.textContent = "Илүү хурдан бөгөөд оновчтой бодлоо!";
+                } else if (p2.score > p1.score) {
+                    winnerTitle.textContent = "Тоглогч 2 ЯЛАА! 🎉";
+                    winnerSub.textContent = "Илүү хурдан бөгөөд оновчтой бодлоо!";
+                } else {
+                    winnerTitle.textContent = "ТЭНЦЛЭЭ! 🤝";
+                    winnerSub.textContent = "Хоёр тоглогч хоёул мундаг байлаа!";
+                }
+            }
+
+            // Trigger Confetti
+            confetti({
+                particleCount: 100,
+                spread: 70,
+                origin: { y: 0.6 }
+            });
+        }
+
+        // Restart Current Game
+        function restartGame() {
+            startGame(currentMode);
+        }
+
+        // Quit to Main Menu
+        function quitGame() {
+            sound.click();
+            clearInterval(gameTimer);
+            clearInterval(aiLoopTimer);
+            document.getElementById('main-menu').classList.remove('hidden');
+            document.getElementById('duel-screen').classList.add('hidden');
+            document.getElementById('speed-screen').classList.add('hidden');
+            document.getElementById('game-over-modal').classList.add('hidden');
+        }
+    </script>
+</body>
+</html>
